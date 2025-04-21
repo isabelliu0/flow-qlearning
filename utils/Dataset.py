@@ -3,6 +3,7 @@ import numpy as np
 class Dataset:
     def __init__(self, data):
         self.data = data
+        
 
     def get_data(self):
         return self.data
@@ -17,5 +18,8 @@ class Dataset:
         return self.data[index]
     
     def sample(self, batch_size):
-        indices = np.random.choice(len(self.data), size=batch_size)
-        return [self.data[i] for i in indices]
+        n = len(next(iter(self.data.values())))
+        indices = np.random.choice(n, batch_size, replace=False)
+        
+        batch = {key: np.array(value)[indices] for key, value in self.data.items()}
+        return batch

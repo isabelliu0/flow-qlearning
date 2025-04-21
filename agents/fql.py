@@ -2,7 +2,7 @@ import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from networks import ActorVectorField, Critic
+from agents.networks import ActorVectorField, Critic, ActorOneStepPolicy
 
 
 def get_config():
@@ -34,35 +34,40 @@ class FQLAgent(nn.Module):
     Combines an ensemble critic (Q-function) and a flow-based actor.
     """
 
-    def __init__(self, config, ob_dims, action_dim, seed=0):
+    def __init__(self, config, ob_dim, action_dim, seed=0):
         super().__init__()
         # Save config and device
         self.config = config
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.ob_dim = ob_dim
+        self.action_dim = action_dim
 
         # random seed
         torch.manual_seed(seed)
 
         # Build the value (critic) network with ensemble heads
         self.critic = Critic(
+            state_dim = ob_dim,
+            action_dim = action_dim,
             hidden_dims=config['value_hidden_dims'],
-            layer_norm=config['layer_norm'],
-            num_ensembles=2,
+            layer_norm=config['layer_norm']
         )
         # Create a target critic for computing stable TD targets
         self.target_critic = copy.deepcopy(self.critic)
 
         # Build the BC flow actor network (predicts velocity field)
         self.actor_bc_flow = ActorVectorField(
+            state_dim = ob_dim,
+            action_dim = action_dim,
             hidden_dims=config['actor_hidden_dims'],
-            action_dim=action_dim,
-            layer_norm=config['actor_layer_norm'],
+            layer_norm=config['actor_layer_norm']
         )
         # Build the one-step flow actor network (distilled policy)
-        self.actor_onestep_flow = ActorVectorField(
+        self.actor_onestep_flow = ActorOneStepPolicy(
+            state_dim = ob_dim,
+            action_dim = action_dim,
             hidden_dims=config['actor_hidden_dims'],
-            action_dim=action_dim,
-            layer_norm=config['actor_layer_norm'],
+            layer_norm=config['actor_layer_norm']
         )
 
         # Register networks as submodules
@@ -73,6 +78,7 @@ class FQLAgent(nn.Module):
 
         # Combine all parameters into one optimizer
         self.optimizer = optim.Adam(self.parameters(), lr=config['lr'])
+        
 
     def critic_loss(self, batch):
         """
@@ -230,6 +236,10 @@ class FQLAgent(nn.Module):
         loss, info = self.total_loss(batch)
         loss.backward()
         self.optimizer.step()
+
+        # Print the loss
+        print(f"Loss is {loss}")
+
         # update target critic parameters
         self._target_update()
         return info
@@ -253,10 +263,12 @@ class FQLAgent(nn.Module):
         Returns:
             actions: Tensor of shape (B x action_dim), clipped to [-1,1]
         """
+        batch_size = observations.shape[0]
         # Draw Gaussian noise for each sample
+        #import ipdb; ipdb.set_trace()
         noises = torch.randn(
-            *observations.shape[: -len(self.config.get('ob_dims', ()))],
-            self.config.get('action_dim'),
+            batch_size,
+            self.action_dim,
             device=self.device
         )
         # Pass through one-step flow actor

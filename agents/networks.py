@@ -8,12 +8,6 @@ import torch.nn.functional as F
 import numpy as np
 
 
-def default_init(scale=1.0):
-    """Default weight initialization."""
-    # a (semi) orthogonal matrix provides good solutions to learning nonlinear dynamics
-    return nn.init.orthogonal_(scale=scale)
-
-
 class MLP (nn.Module):
     """Multi-layer peceptron with optional layer normalization.
     
@@ -36,7 +30,8 @@ class MLP (nn.Module):
 
         for hidden_dim in hidden_dims:
             linear = nn.Linear(prev_dim, hidden_dim)
-            default_init()(linear.weight)
+            # NOTE: a (semi) orthogonal matrix provides good solutions to learning nonlinear dynamics
+            nn.init.orthogonal_(linear.weight, gain=1.0)
             nn.init.zeros_(linear.bias)
 
             layers.append(linear)
@@ -47,7 +42,7 @@ class MLP (nn.Module):
             prev_dim = hidden_dim
         
         final_layer = nn.Linear(prev_dim, output_dim)
-        default_init(1e-2)(final_layer.weight)
+        nn.init.orthogonal_(final_layer.weight, gain=1e-2)
         nn.init.zeros_(final_layer.bias)
         layers.append(final_layer)
 
