@@ -93,7 +93,7 @@ def main(_):
     # DEFINING AGENT
     config = FLAGS.config 
     config = get_config()
-    agent = agents[FLAGS.agent](ob_dim=state_dim, action_dim=action_dim,config=config)
+    agent = agents[FLAGS.agent](ob_dim=state_dim, action_dim=action_dim,config=config,device=device)
 
     # TRAINING
     train_dataset = Dataset(train_dataset)

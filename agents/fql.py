@@ -34,7 +34,7 @@ class FQLAgent(nn.Module):
     Combines an ensemble critic (Q-function) and a flow-based actor.
     """
 
-    def __init__(self, config, ob_dim, action_dim, seed=0):
+    def __init__(self, config, ob_dim, action_dim, device="cpu",seed=0):
         super().__init__()
         # Save config and device
         self.config = config
@@ -61,14 +61,14 @@ class FQLAgent(nn.Module):
             action_dim = action_dim,
             hidden_dims=config['actor_hidden_dims'],
             layer_norm=config['actor_layer_norm']
-        )
+        ).to(device)
         # Build the one-step flow actor network (distilled policy)
         self.actor_onestep_flow = ActorOneStepPolicy(
             state_dim = ob_dim,
             action_dim = action_dim,
             hidden_dims=config['actor_hidden_dims'],
             layer_norm=config['actor_layer_norm']
-        )
+        ).to(device)
 
         # Register networks as submodules
         self.add_module('critic', self.critic)
