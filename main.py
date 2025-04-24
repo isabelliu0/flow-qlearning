@@ -17,7 +17,7 @@ flags.DEFINE_integer('offline_steps', 1000000, 'Number of offline steps.')
 flags.DEFINE_integer('batch_size', 256, 'Batch size for training.')
 flags.DEFINE_integer('eval_interval', 10000, 'Number of steps between evaluations.')
 flags.DEFINE_integer('eval_episodes', 10, 'Number of evaluation episodes.')
-flags.DEFINE_integer('save_interval', 100000, "Number of steps between model saves.")
+flags.DEFINE_integer('save_interval', 1000000, "Number of steps between model saves.")
 flags.DEFINE_integer('seed', 42, "Random seed.")
 flags.DEFINE_string('save_dir', 'results/', "Directory to save results.")
 flags.DEFINE_float('alpha', 10.0, 'BC coefficient for FQL.')
@@ -29,7 +29,15 @@ config_flags.DEFINE_config_file(
     lock_config=False,
 )
 
-device = "cpu"
+# See if CUDA is available
+is_avail = torch.cuda.is_available()
+if is_avail: 
+    print("Cuda is available")
+    device = "cuda"
+else:
+    print("Cuda is not available")
+    device = "cpu"
+
 
 def evaluate(agent, env, num_episodes=10):
     """Evaluate the agent."""
@@ -76,6 +84,7 @@ def prepare_batch_for_agent(batch, device):
  
 
 def main(_):
+    best_eval_return = 0
     np.random.seed(FLAGS.seed)
     torch.manual_seed(FLAGS.seed)
 

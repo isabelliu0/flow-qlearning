@@ -41,6 +41,8 @@ class FQLAgent(nn.Module):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.ob_dim = ob_dim
         self.action_dim = action_dim
+        self.device = device
+        print(f"Device for FQL is {self.device}")
 
         # random seed
         torch.manual_seed(seed)
@@ -51,7 +53,7 @@ class FQLAgent(nn.Module):
             action_dim = action_dim,
             hidden_dims=config['value_hidden_dims'],
             layer_norm=config['layer_norm']
-        )
+        ).to(device)
         # Create a target critic for computing stable TD targets
         self.target_critic = copy.deepcopy(self.critic)
 
@@ -162,7 +164,7 @@ class FQLAgent(nn.Module):
 
         # 2) Distillation loss
         # Sample noises for one-step policy
-        noises = torch.randn_like(batch['actions'])
+        noises = torch.randn_like(batch['actions']).to(self.device)
         # Compute "ground truth" multi-step flow actions
         with torch.no_grad():
             target_flow_actions = self.compute_flow_actions(batch['observations'], noises)
@@ -214,6 +216,11 @@ class FQLAgent(nn.Module):
         # Merge diagnostics under separate keys
         info = {f'critic/{k}': v for k, v in c_info.items()}
         info.update({f'actor/{k}': v for k, v in a_info.items()})
+
+        # PRINT LOSS FOR LOSS CURVE (COMMENT OUT)
+        # with open("losscurve.txt", "a") as f:
+        #     f.write(str(loss.item())+"\n")
+
         return loss, info
 
     def update(self, batch):
@@ -236,9 +243,6 @@ class FQLAgent(nn.Module):
         loss, info = self.total_loss(batch)
         loss.backward()
         self.optimizer.step()
-
-        # Print the loss
-        print(f"Loss is {loss}")
 
         # update target critic parameters
         self._target_update()

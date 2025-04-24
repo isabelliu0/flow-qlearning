@@ -1,0 +1,62 @@
+Hello World
+Currently Loaded Modulefiles:
+ 1) cudatoolkit/12.8   2) anaconda3/2024.6  
+conda 24.5.0
+Cuda is available
+Device for FQL is cuda
+Step: 1000, Critic Loss: 0.0829, Actor Loss: -87.1041, Q Mean: 87.4709
+Step: 2000, Critic Loss: 0.1228, Actor Loss: -137.0961, Q Mean: 137.3849
+Step: 3000, Critic Loss: 0.0868, Actor Loss: -155.1748, Q Mean: 155.5036
+Step: 4000, Critic Loss: 0.5008, Actor Loss: -232.4907, Q Mean: 232.7637
+Step: 5000, Critic Loss: 321.1389, Actor Loss: -291.5352, Q Mean: 291.7632
+Step: 6000, Critic Loss: 1.7414, Actor Loss: -325.1215, Q Mean: 325.4044
+Step: 7000, Critic Loss: 1.1800, Actor Loss: -353.4876, Q Mean: 353.7251
+Step: 8000, Critic Loss: 8.7649, Actor Loss: -386.9272, Q Mean: 387.1831
+Step: 9000, Critic Loss: 0.9514, Actor Loss: -437.1373, Q Mean: 437.3553
+Step: 10000, Critic Loss: 4.8590, Actor Loss: -488.6085, Q Mean: 488.7080
+Evaluation at step 10000: Mean Return: -1000.00 ± 0.00
+Step: 11000, Critic Loss: 3.7605, Actor Loss: -529.0722, Q Mean: 529.2785
+Step: 12000, Critic Loss: 481.3323, Actor Loss: -578.2512, Q Mean: 578.3679
+Step: 13000, Critic Loss: 0.7256, Actor Loss: -631.1912, Q Mean: 631.4071
+Step: 14000, Critic Loss: 3.1528, Actor Loss: -672.4535, Q Mean: 672.6022
+Step: 15000, Critic Loss: 1.3031, Actor Loss: -719.8610, Q Mean: 720.1152
+Step: 16000, Critic Loss: 1.6501, Actor Loss: -775.4072, Q Mean: 775.7118
+Step: 17000, Critic Loss: 794.8235, Actor Loss: -820.5634, Q Mean: 819.0936
+Step: 18000, Critic Loss: 1.3748, Actor Loss: -888.4494, Q Mean: 888.6785
+Step: 19000, Critic Loss: 7.6787, Actor Loss: -938.8951, Q Mean: 939.1542
+Step: 20000, Critic Loss: 156.6986, Actor Loss: -1008.4965, Q Mean: 1005.8038
+Evaluation at step 20000: Mean Return: -1000.00 ± 0.00
+Step: 21000, Critic Loss: 1.9021, Actor Loss: -1045.3160, Q Mean: 1045.5420
+Step: 22000, Critic Loss: 3.1198, Actor Loss: -1079.9487, Q Mean: 1080.1526
+Step: 23000, Critic Loss: 0.5378, Actor Loss: -1138.2080, Q Mean: 1138.4360
+Step: 24000, Critic Loss: 3.3110, Actor Loss: -1186.2549, Q Mean: 1186.4659
+Step: 25000, Critic Loss: 3.4044, Actor Loss: -1222.6581, Q Mean: 1222.8529
+Step: 26000, Critic Loss: 0.7204, Actor Loss: -1261.1890, Q Mean: 1261.6259
+Step: 27000, Critic Loss: 285.1789, Actor Loss: -1308.7043, Q Mean: 1308.2454
+Step: 28000, Critic Loss: 11.6480, Actor Loss: -1353.1444, Q Mean: 1348.5044
+Step: 29000, Critic Loss: 0.7575, Actor Loss: -1386.1168, Q Mean: 1386.3535
+Step: 30000, Critic Loss: 19.9982, Actor Loss: -1432.8567, Q Mean: 1429.4012
+Evaluation at step 30000: Mean Return: -1000.00 ± 0.00
+Step: 31000, Critic Loss: 0.9376, Actor Loss: -1487.7584, Q Mean: 1488.0188
+Step: 32000, Critic Loss: 4.8880, Actor Loss: -1539.0004, Q Mean: 1539.2924
+Step: 33000, Critic Loss: 4.5963, Actor Loss: -1558.7139, Q Mean: 1558.9387
+Step: 34000, Critic Loss: 4.3733, Actor Loss: -1572.5059, Q Mean: 1572.8163
+Step: 35000, Critic Loss: 1.8315, Actor Loss: -1594.4161, Q Mean: 1594.6627
+Step: 36000, Critic Loss: 2.0995, Actor Loss: -1617.4426, Q Mean: 1617.7292
+Step: 37000, Critic Loss: 0.5749, Actor Loss: -1673.6669, Q Mean: 1674.0592
+Step: 38000, Critic Loss: 3.0391, Actor Loss: -1706.8970, Q Mean: 1707.3110
+Step: 39000, Critic Loss: 0.9218, Actor Loss: -1768.2662, Q Mean: 1768.5518
+Step: 40000, Critic Loss: 1.0497, Actor Loss: -1823.9016, Q Mean: 1824.1555
+Evaluation at step 40000: Mean Return: -1000.00 ± 0.00
+Step: 41000, Critic Loss: 5.4521, Actor Loss: -1869.2061, Q Mean: 1869.4879
+Step: 42000, Critic Loss: 25.8501, Actor Loss: -1901.8563, Q Mean: 1901.9966
+Step: 43000, Critic Loss: 10.1226, Actor Loss: -1953.0576, Q Mean: 1953.2915
+Step: 44000, Critic Loss: 1.0322, Actor Loss: -1999.5251, Q Mean: 1999.8193
+Step: 45000, Critic Loss: 12.4397, Actor Loss: -2031.4753, Q Mean: 2031.9097
+Step: 46000, Critic Loss: 0.6984, Actor Loss: -2069.3201, Q Mean: 2069.6260
+Step: 47000, Critic Loss: 0.6011, Actor Loss: -2104.2788, Q Mean: 2104.5630
+Step: 48000, Critic Loss: 10.1906, Actor Loss: -2153.6294, Q Mean: 2153.8276
+Step: 49000, Critic Loss: 1.8301, Actor Loss: -2183.4172, Q Mean: 2183.6938
+Step: 50000, Critic Loss: 0.3501, Actor Loss: -2243.7795, Q Mean: 2244.0476
+Evaluation at step 50000: Mean Return: -1000.00 ± 0.00
+Final Evaluation: Mean Return: -1000.00 ± 0.00
