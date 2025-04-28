@@ -15,7 +15,7 @@ flags.DEFINE_string('agent', "fql", 'Agent name')
 flags.DEFINE_string('env', "cube-double-play-singletask-v0", 'Env name')
 flags.DEFINE_integer('offline_steps', 1000000, 'Number of offline steps.')
 flags.DEFINE_integer('batch_size', 256, 'Batch size for training.')
-flags.DEFINE_integer('eval_interval', 10000, 'Number of steps between evaluations.')
+flags.DEFINE_integer('eval_interval', 1000, 'Number of steps between evaluations.')
 flags.DEFINE_integer('eval_episodes', 10, 'Number of evaluation episodes.')
 flags.DEFINE_integer('save_interval', 1000000, "Number of steps between model saves.")
 flags.DEFINE_integer('seed', 42, "Random seed.")
@@ -127,6 +127,10 @@ def main(_):
             print(f"Evaluation at step {step}: " +
                   f"Mean Return: {eval_metrics['eval/return_mean']:.2f} ± {eval_metrics['eval/return_std']:.2f}")
             
+            #PRINT LOSS FOR EVALS CURVE
+            with open("evals.txt", "a") as f:
+                f.write(str(eval_metrics['eval/return_mean'])+"\n")
+
             if eval_metrics['eval/return_mean'] > best_eval_return:
                 best_eval_return = eval_metrics['eval/return_mean']
                 torch.save(agent.state_dict(), os.path.join(save_dir, "best_model.pt"))
