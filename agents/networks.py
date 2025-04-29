@@ -118,7 +118,6 @@ class ActorOneStepPolicy(nn.Module):
         actions = self.net(inputs)
         return torch.tanh(actions)
 
-
 class Critic(nn.Module):
     """Critic network (Q-function).
     
