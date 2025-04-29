@@ -53,7 +53,7 @@ def evaluate(agent, env, num_episodes=10):
         while not done:
             obs_tensor = torch.FloatTensor(obs).unsqueeze(0).to(agent.device)
             with torch.no_grad():
-                action = agent.sample_actions(obs_tensor)
+                action = agent.sample_actions(obs_tensor, seed=0)
                 action = action.cpu().numpy().squeeze(0)
             
             # Step in the environment

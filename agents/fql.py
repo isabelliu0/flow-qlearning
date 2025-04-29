@@ -258,27 +258,24 @@ class FQLAgent(nn.Module):
         for param, target_param in zip(self.critic.parameters(), self.target_critic.parameters()):
             target_param.data.copy_(tau * param.data + (1 - tau) * target_param.data)
 
-    def sample_actions(self, observations):
+    def sample_actions(self, observations, seed=None):
         """
         Sample actions from one-step flow policy.
 
-        Args:
-            observations: Tensor of shape (B x *ob_dims)
-        Returns:
-            actions: Tensor of shape (B x action_dim), clipped to [-1,1]
+        If seed is None: draw fresh Gaussian noise.
+        If seed is not None: return the mean action (zero noise).
         """
-        batch_size = observations.shape[0]
-        # Draw Gaussian noise for each sample
-        #import ipdb; ipdb.set_trace()
-        noises = torch.randn(
-            batch_size,
-            self.action_dim,
-            device=self.device
-        )
-        # Pass through one-step flow actor
+        B = observations.shape[0]
+        if seed is None:
+            # stochastic sampling
+            noises = torch.randn(B, self.action_dim, device=self.device)
+        else:
+            # deterministic: zero noise gives the “mean” action
+            noises = torch.zeros(B, self.action_dim, device=self.device)
+
         actions = self.actor_onestep_flow(observations, noises)
-        # Clip to valid action range
         return torch.clamp(actions, -1.0, 1.0)
+
 
     def compute_flow_actions(self, observations, noises):
         """
