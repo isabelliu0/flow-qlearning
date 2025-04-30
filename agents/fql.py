@@ -1,6 +1,7 @@
 import copy
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from agents.networks import ActorVectorField, Critic, ActorOneStepPolicy
 
@@ -55,7 +56,10 @@ class FQLAgent(nn.Module):
             layer_norm=config['layer_norm']
         ).to(device)
         # Create a target critic for computing stable TD targets
-        self.target_critic = copy.deepcopy(self.critic)
+        self.target_critic = copy.deepcopy(self.critic).to(device)
+        # Freeze target network - only updated via soft updates
+        for param in self.target_critic.parameters():
+            param.requires_grad = False
 
         # Build the BC flow actor network (predicts velocity field)
         self.actor_bc_flow = ActorVectorField(
@@ -98,37 +102,56 @@ class FQLAgent(nn.Module):
             loss      : scalar tensor of MSE loss
             diagnostics: dict of logging values
         """
-        # Sample next actions from current policy, then clip to [-1,1]
-        next_actions = self.sample_actions(batch['next_observations'])
-        next_actions = torch.clamp(next_actions, -1.0, 1.0)
+        observations = batch['observations']
+        actions = batch['actions']
+        rewards = batch['rewards']
+        next_observations = batch['next_observations']
+        masks = batch['masks']
 
-        # Compute target Q-values: use target critic network
-        # Shape of next_qs: (B x num_ensembles)
-        next_qs = self.target_critic(batch['next_observations'], next_actions)
-        if self.config['q_agg'] == 'min':
-            # Take minimum across ensemble for conservative estimate
-            next_q, _ = next_qs.min(dim=1, keepdim=True)
-        else:
-            # Take mean across ensemble
-            next_q = next_qs.mean(dim=1, keepdim=True)
+        # Ensure rewards and masks have shape [batch_size, 1]
+        if len(rewards.shape) == 1:
+            rewards = rewards.unsqueeze(-1)
+        if len(masks.shape) == 1:
+            masks = masks.unsqueeze(-1)
 
-        # Build TD target r + γ * mask * next_q
-        target_q = batch['rewards'] + self.config['discount'] * batch['masks'] * next_q
+        with torch.no_grad():
+            # Sample next actions from current policy, then clip to [-1,1]
+            next_actions = self.sample_actions(next_observations, seed=0)
+            next_actions = torch.clamp(next_actions, -1.0, 1.0)
+
+            # Compute target Q-values: use target critic network
+            next_qs = self.target_critic(next_observations, next_actions)
+            if self.config['q_agg'] == 'min':
+                # Take minimum across ensemble for conservative estimate
+                next_q, _ = torch.min(next_qs, dim=0)[0]
+            else:
+                # Take mean across ensemble
+                next_q = torch.mean(next_qs, dim=0)
+            if len(next_q.shape) == 1:
+                next_q = next_q.unsqueeze(-1)
+
+            # Build TD target r + γ * mask * Q(s', a')
+            # Shape [batch_size, 1]
+            target_q = rewards + self.config['discount'] * masks * next_q
 
         # Compute current Q-values from critic under current parameters
-        # Shape of q: (B x 1) if critic returns single output per sample, else mean
-        q_values = self.critic(batch['observations'], batch['actions'])
-        # Mean-squared error loss
-        loss = torch.mean((q_values - target_q).pow(2))
+        current_qs = self.critic(observations, actions)
+ 
+        # Compute MSE loss for each critic in the ensemble
+        critic_loss = 0
+        for q in current_qs:
+            q = q.unsqueeze(-1)
+            critic_loss += F.mse_loss(q, target_q)
+        critic_loss /= len(current_qs)
 
         # Logging diagnostics
         diagnostics = {
-            'critic_loss': loss.item(),
-            'q_mean': q_values.mean().item(),
-            'q_max': q_values.max().item(),
-            'q_min': q_values.min().item(),
+            'critic_loss': critic_loss.item(),
+            'q_mean': current_qs.mean().item(),
+            'q_max': current_qs.max().item(),
+            'q_min': current_qs.min().item(),
         }
-        return loss, diagnostics
+        return critic_loss, diagnostics
 
     def actor_loss(self, batch):
         """
@@ -144,43 +167,32 @@ class FQLAgent(nn.Module):
             loss      : scalar tensor of actor loss
             diagnostics: dict of logging values
         """
-        B, action_dim = batch['actions'].shape
+        observations = batch['observations']
+        batch_size = observations.shape[0]
 
-        # 1) Behavioral cloning (BC) flow loss
-        # Sample x0 ~ N(0,I)
-        x0 = torch.randn_like(batch['actions'])
-        # Expert actions x1
-        x1 = batch['actions']
-        # Uniform time t in [0,1]
-        t = torch.rand(B, 1, device=self.device)
-        # Interpolate: x_t = (1-t)x0 + t x1
+        # 1. BC flow loss - train the flow model to match noise to action
+        # Sample Gaussian noise x0
+        x0 = torch.randn(batch_size, self.action_dim, device=self.device)
+        x1 = batch['actions']   # Expert action x1
+        t = torch.rand(batch_size, 1, device=self.device)
         xt = (1 - t) * x0 + t * x1
-        # True velocity v = x1 - x0
-        v_true = x1 - x0
-        # Predict velocity from BC flow network
-        v_pred = self.actor_bc_flow(batch['observations'], xt, t)
-        # MSE loss between predicted and true velocity
-        bc_flow_loss = torch.mean((v_pred - v_true).pow(2))
+        v_true = x1 - x0    # True velocity vector
+        v_pred = self.actor_bc_flow(observations, xt, t)
+        bc_flow_loss = F.mse_loss(v_pred, v_true)
 
         # 2) Distillation loss
         # Sample noises for one-step policy
-        noises = torch.randn_like(batch['actions']).to(self.device)
+        noises = torch.randn(batch_size, self.action_dim, device=self.device)
         # Compute "ground truth" multi-step flow actions
         with torch.no_grad():
-            target_flow_actions = self.compute_flow_actions(batch['observations'], noises)
-        # One-step policy output
-        actor_actions = self.actor_onestep_flow(batch['observations'], noises)
-        # MSE distillation loss
-        distill_loss = torch.mean((actor_actions - target_flow_actions).pow(2))
+            target_flow_actions = self.compute_flow_actions(observations, noises)
+        actor_actions = self.actor_onestep_flow(observations, noises)
+        distill_loss = F.mse_loss(actor_actions, target_flow_actions)
 
         # 3) Q-based loss to maximize value
-        # Clip actions to valid range
         actor_actions_clipped = torch.clamp(actor_actions, -1.0, 1.0)
-        # Query critic ensemble on these actions
-        qs = self.critic(batch['observations'], actor_actions_clipped)
-        # Aggregate across ensemble then average over batch
-        q_val = qs.mean(dim=1, keepdim=True)
-        # Negative because we minimize loss
+        qs = self.critic(observations, actor_actions_clipped)
+        q_val = qs.mean(dim=0)  # Average across ensemble and batch
         q_loss = -q_val.mean()
         # Optionally normalize Q-loss magnitude
         if self.config['normalize_q_loss']:
@@ -188,19 +200,19 @@ class FQLAgent(nn.Module):
             q_loss = factor * q_loss
 
         # Total actor loss
-        loss = bc_flow_loss + self.config['alpha'] * distill_loss + q_loss
+        actor_loss = bc_flow_loss + self.config['alpha'] * distill_loss + q_loss
 
         # Logging diagnostics
-        mse = torch.mean((actor_actions - batch['actions']).pow(2))
+        mse = F.mse_loss(actor_actions, batch['actions'])
         diagnostics = {
-            'actor_loss': loss.item(),
+            'actor_loss': actor_loss.item(),
             'bc_flow_loss': bc_flow_loss.item(),
             'distill_loss': distill_loss.item(),
             'q_loss': q_loss.item(),
             'q_mean': q_val.mean().item(),
             'mse': mse.item(),
         }
-        return loss, diagnostics
+        return actor_loss, diagnostics
 
     def total_loss(self, batch):
         """
@@ -239,6 +251,19 @@ class FQLAgent(nn.Module):
         self.train()
         # Zero existing gradients
         self.optimizer.zero_grad()
+
+        # Standardize batch format
+        # If batch is a tuple (from ReplayBuffer), convert to dict
+        if isinstance(batch, tuple):
+            observations, actions, next_observations, rewards, masks = batch
+            batch = {
+                'observations': observations,
+                'actions': actions,
+                'next_observations': next_observations,
+                'rewards': rewards,
+                'masks': masks
+            }
+
         # Compute loss and info
         loss, info = self.total_loss(batch)
         loss.backward()
@@ -265,16 +290,16 @@ class FQLAgent(nn.Module):
         If seed is None: draw fresh Gaussian noise.
         If seed is not None: return the mean action (zero noise).
         """
-        B = observations.shape[0]
-        if seed is None:
-            # stochastic sampling
-            noises = torch.randn(B, self.action_dim, device=self.device)
-        else:
-            # deterministic: zero noise gives the “mean” action
-            noises = torch.zeros(B, self.action_dim, device=self.device)
-
-        actions = self.actor_onestep_flow(observations, noises)
-        return torch.clamp(actions, -1.0, 1.0)
+        self.eval()
+        with torch.no_grad():
+            batch_size = observations.shape[0]
+            if seed is not None:
+                torch.manual_seed(seed)
+            noises = torch.randn(batch_size, self.action_dim, device=self.device)
+            actions = self.actor_onestep_flow(observations, noises)
+            actions = torch.clamp(actions, -1.0, 1.0)
+        
+        return actions
 
 
     def compute_flow_actions(self, observations, noises):
@@ -302,27 +327,3 @@ class FQLAgent(nn.Module):
             actions = actions + v / K
         # Ensure actions stay within bounds
         return torch.clamp(actions, -1.0, 1.0)
-
-    @classmethod
-    def create(cls, seed, ex_observations, ex_actions, config=None):
-        """
-        Factory method to instantiate and initialize the agent.
-
-        Args:
-            seed           : random seed for reproducibility
-            ex_observations: example observations tensor for shape inference
-            ex_actions     : example actions tensor for shape inference
-            config         : optional config dict. If None, uses get_config().
-
-        Returns:
-            agent: an initialized FQLAgent on the correct device
-        """
-        # Use default config if none provided
-        cfg = config or get_config()
-        # Infer dimensions from example tensors
-        ob_dims = tuple(ex_observations.shape[1:])
-        action_dim = ex_actions.shape[-1]
-        # Instantiate agent
-        agent = cls(cfg, ob_dims, action_dim, seed)
-        # Move to correct device
-        return agent.to(agent.device)
