@@ -41,14 +41,17 @@ else:
 
 def evaluate(agent, env, num_episodes=10):
     """Evaluate the agent."""
+    agent.eval()
     episode_rewards = []
     episode_lengths = []
+    episode_success = []
 
     for _ in range(num_episodes):
-        obs, _, = env.reset()
+        obs, _ = env.reset()
         done = False
         episode_reward = 0
         episode_length = 0
+        success = False
 
         while not done:
             obs_tensor = torch.FloatTensor(obs).unsqueeze(0).to(agent.device)
@@ -58,6 +61,8 @@ def evaluate(agent, env, num_episodes=10):
             
             # Step in the environment
             next_obs, reward, terminated, truncated, _ = env.step(action)
+            if terminated:
+                success = True
             done = terminated or truncated
             episode_reward += reward
             episode_length += 1
@@ -65,11 +70,13 @@ def evaluate(agent, env, num_episodes=10):
         
         episode_rewards.append(episode_reward)
         episode_lengths.append(episode_length)
+        episode_success.append(float(success))
     
     return {
         'eval/return_mean': np.mean(episode_rewards),
         'eval/return_std': np.std(episode_rewards),
-        'eval/length_mean': np.mean(episode_lengths)
+        'eval/length_mean': np.mean(episode_lengths),
+        'eval/return_success': np.mean(episode_success) * 100.0
     }
 
 def prepare_batch_for_agent(batch, device):
@@ -125,7 +132,9 @@ def main(_):
             eval_metrics = evaluate(agent, eval_env, num_episodes=FLAGS.eval_episodes)
 
             print(f"Evaluation at step {step}: " +
-                  f"Mean Return: {eval_metrics['eval/return_mean']:.2f} ± {eval_metrics['eval/return_std']:.2f}")
+                  f"Mean Return: {eval_metrics['eval/return_mean']:.2f} ± {eval_metrics['eval/return_std']:.2f}; " +
+                  f"Mean Success: {eval_metrics['eval/return_success']:.2f}"
+            )
             
             #PRINT LOSS FOR EVALS CURVE
             with open("evals.txt", "a") as f:

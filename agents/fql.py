@@ -17,10 +17,10 @@ def get_config():
         'batch_size': 256,            #  # samples per training batch
         'discount': 0.99,             # Discount factor γ for TD targets
         'tau': 0.005,                 # averaging rate for target updates
-        'q_agg': 'mean',              # specify how to aggregate ensemble Q-values: 'mean' or 'min'
-        'alpha': 10.0,                # Weight for distillation loss in actor objective
+        'q_agg': 'min',              # specify how to aggregate ensemble Q-values: 'mean' or 'min'
+        'alpha': 1.0,                # Weight for distillation loss in actor objective
         'flow_steps': 10,             #  # of  Euler integration steps for BC flow
-        'normalize_q_loss': False,    # Whether to re-scale Q-loss term
+        'normalize_q_loss': True,    # Whether to re-scale Q-loss term
         # Network architecture settings
         'actor_hidden_dims': (512, 512, 512, 512),
         'value_hidden_dims': (512, 512, 512, 512),
@@ -87,21 +87,7 @@ class FQLAgent(nn.Module):
         
 
     def critic_loss(self, batch):
-        """
-        Compute the critic (Q-function) mean-squared TD error.
-
-        Args:
-            batch: dict with tensors:
-                'observations'       (B x *ob_dims),
-                'actions'            (B x action_dim),
-                'next_observations'  (B x *ob_dims),
-                'rewards'            (B x 1),
-                'masks'              (B x 1)  (0 if episode ended, else 1)
-
-        Returns:
-            loss      : scalar tensor of MSE loss
-            diagnostics: dict of logging values
-        """
+        """Compute the critic (Q-function) mean-squared TD error."""
         observations = batch['observations']
         actions = batch['actions']
         rewards = batch['rewards']
@@ -120,10 +106,11 @@ class FQLAgent(nn.Module):
             next_actions = torch.clamp(next_actions, -1.0, 1.0)
 
             # Compute target Q-values: use target critic network
-            next_qs = self.target_critic(next_observations, next_actions)
+            with torch.no_grad():
+                next_qs = self.target_critic(next_observations, next_actions)
             if self.config['q_agg'] == 'min':
                 # Take minimum across ensemble for conservative estimate
-                next_q, _ = torch.min(next_qs, dim=0)[0]
+                next_q = torch.min(next_qs, dim=0)[0]
             else:
                 # Take mean across ensemble
                 next_q = torch.mean(next_qs, dim=0)
@@ -187,7 +174,8 @@ class FQLAgent(nn.Module):
         with torch.no_grad():
             target_flow_actions = self.compute_flow_actions(observations, noises)
         actor_actions = self.actor_onestep_flow(observations, noises)
-        distill_loss = F.mse_loss(actor_actions, target_flow_actions)
+        actor_actions_clipped = torch.clamp(actor_actions, -1.0, 1.0)
+        distill_loss = F.mse_loss(actor_actions_clipped, target_flow_actions)
 
         # 3) Q-based loss to maximize value
         actor_actions_clipped = torch.clamp(actor_actions, -1.0, 1.0)
@@ -325,5 +313,6 @@ class FQLAgent(nn.Module):
             v = self.actor_bc_flow(obs_enc, actions, t)
             # Euler integration step
             actions = actions + v / K
+            actions = torch.clamp(actions, -1.0, 1.0)
         # Ensure actions stay within bounds
         return torch.clamp(actions, -1.0, 1.0)
