@@ -281,9 +281,15 @@ class FQLAgent(nn.Module):
         self.eval()
         with torch.no_grad():
             batch_size = observations.shape[0]
+            # if seed is not None:
+            #     torch.manual_seed(seed)
+            # noises = torch.randn(batch_size, self.action_dim, device=self.device)
             if seed is not None:
-                torch.manual_seed(seed)
-            noises = torch.randn(batch_size, self.action_dim, device=self.device)
+                # deterministic (mean) action
+                noises = torch.zeros(batch_size, self.action_dim, device=self.device)
+            else:
+                # sample true stochastic action
+                noises = torch.randn(batch_size, self.action_dim, device=self.device)
             actions = self.actor_onestep_flow(observations, noises)
             actions = torch.clamp(actions, -1.0, 1.0)
         
